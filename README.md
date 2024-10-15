@@ -22,4 +22,6 @@ mkdir openhouse2024_competition
 データセットをtrainと同じ構造にするためのプログラム
 
 ### 結果
-![Accuracy](vscode-remote://attached-container%2B7b22636f6e7461696e65724e616d65223a222f707974686f6e335f6c6f63616c222c2273657474696e6773223a7b22636f6e74657874223a226465736b746f702d6c696e7578227d7d/src/openhouse2024/result/acc.png)
+![acc](https://github.com/user-attachments/assets/c60ec00d-fe56-4297-b4e8-65a83481591e)
+
+![loss](https://github.com/user-attachments/assets/dea45a72-7994-473e-8863-0a4b95ba929e)
