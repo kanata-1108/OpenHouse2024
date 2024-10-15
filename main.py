@@ -75,14 +75,17 @@ if __name__ == "__main__":
     now_date = datetime.now(ZoneInfo("Asia/Tokyo"))
     print(f"-----{now_date}-----")
 
-    dir_path = '/src/openhouse2024'
+    # dir_path = '/src/openhouse2024'
+    dir_path = ''
     os.chdir(dir_path)
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     # データのディレクトリパス
-    train_dir = './openhouse2024_competition/train'
-    valid_dir = './openhouse2024_competition/testv2'
+    # train_dir = './openhouse2024_competition/train'
+    # valid_dir = './openhouse2024_competition/testv2'
+    train_dir = ''
+    valid_dir = ''
 
     # データの前処理
     transform_train = transforms.Compose([
@@ -174,8 +177,14 @@ if __name__ == "__main__":
     plt.savefig("./result/acc.png")
 
     # モデルの保存
+    save_dir = './model_weight'
+    if os.path.exists(save_dir):
+        pass
+    else:
+        os.mkdir(save_dir)
+
     now_date = datetime.now(ZoneInfo("Asia/Tokyo"))
     now_date_str = now_date.strftime("%Y-%m-%d-%H-%M")
 
     model_pram = model.state_dict()
-    torch.save(model.state_dict(), f'/src/openhouse2024/model_weight/{now_date_str}.pth')
+    torch.save(model.state_dict(), f'./model_weight/{now_date_str}.pth')

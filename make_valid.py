@@ -3,11 +3,13 @@ import pandas as pd
 import shutil
 
 # testディレクトリのパス
-test_dir = "/src/openhouse2024/openhouse2024_competition/eval_data"
+# test_dir = "/src/openhouse2024/openhouse2024_competition/eval_data"
+test_dir = ''
 
 # 変更後のディレクトリの作成
 # testv2に変更ごの内容を保存する
-save_dir = "/src/openhouse2024/openhouse2024_competition/eval_datav2"
+# save_dir = "/src/openhouse2024/openhouse2024_competition/eval_datav2"
+save_dir = ''
 
 # 既にディレクトリが作成されている場合は作成処理を行わない
 if os.path.exists(save_dir):
