@@ -1,4 +1,6 @@
 import os
+import pandas as pd
+import shutil
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -10,6 +12,37 @@ from residualblock import ResidualBlock
 from timm.scheduler import CosineLRScheduler
 from datetime import datetime
 from zoneinfo import ZoneInfo
+
+def make_dataset(dir_path, savedir_path):
+
+    # 既にディレクトリが作成されている場合は作成処理を行わない
+    if os.path.exists(save_dir):
+        pass
+    else:
+        os.mkdir(save_dir)
+    
+    # images_info.csvの読み込み
+    img_data = pd.read_csv(dir_path + '/images_info.csv', header = None)
+
+    classes = sorted(img_data[1].unique())
+
+    for class_name in classes:
+
+        # class_name毎のディレクトリのパス
+        class_dir = savedir_path + "/" + class_name
+
+        # 既にディレクトリが作成されている場合は作成処理を行わない
+        if os.path.exists(class_dir):
+            pass
+        else:
+            os.mkdir(class_dir)
+
+        # class_nameごとのimageファイルの抽出とリスト化
+        img_list = img_data[img_data[1] == class_name][0].to_list()
+
+        # 該当の画像をtestv2の各クラスディレクトリにコピー
+        for img in img_list:
+            shutil.copy(dir_path + "/images/" + img, class_dir)
 
 # 評価用関数
 def evaluation(net_model, loader):
@@ -75,17 +108,14 @@ if __name__ == "__main__":
     now_date = datetime.now(ZoneInfo("Asia/Tokyo"))
     print(f"-----{now_date}-----")
 
-    # dir_path = '/src/openhouse2024'
-    dir_path = ''
-    os.chdir(dir_path)
-
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    # データのディレクトリパス
-    # train_dir = './openhouse2024_competition/train'
-    # valid_dir = './openhouse2024_competition/testv2'
-    train_dir = ''
-    valid_dir = ''
+    # validデータセット作成
+    valid_dir = '~~~/testv2'
+    make_dataset(dir_path = '~~~/test', savedir_path = valid_dir)
+
+    # trainデータのディレクトリパス
+    train_dir = '~~~/train'
 
     # データの前処理
     transform_train = transforms.Compose([
@@ -119,7 +149,7 @@ if __name__ == "__main__":
     scheduler = CosineLRScheduler(optimizer, t_initial = epochs, lr_min = 0.0001, warmup_t = 20, warmup_lr_init = 0.00005, warmup_prefix = True)
 
     # 結果を格納するディレクトリの作成
-    save_dir = './result'
+    save_dir = '~~~/result'
     if os.path.exists(save_dir):
         pass
     else:
@@ -164,7 +194,7 @@ if __name__ == "__main__":
     plt.grid()
     plt.legend()
     plt.title('loss')
-    plt.savefig("./result/loss.png")
+    plt.savefig("~~~/result/loss.png")
     plt.clf()
 
     plt.plot(range(epochs), train_acc_value, c = 'orange', label = 'train acc')
@@ -174,17 +204,14 @@ if __name__ == "__main__":
     plt.grid()
     plt.legend()
     plt.title('acc')
-    plt.savefig("./result/acc.png")
+    plt.savefig("~~~/result/acc.png")
 
     # モデルの保存
-    save_dir = './model_weight'
+    save_dir = '~~~/model_weight'
     if os.path.exists(save_dir):
         pass
     else:
         os.mkdir(save_dir)
 
-    now_date = datetime.now(ZoneInfo("Asia/Tokyo"))
-    now_date_str = now_date.strftime("%Y-%m-%d-%H-%M")
-
     model_pram = model.state_dict()
-    torch.save(model.state_dict(), f'./model_weight/{now_date_str}.pth')
+    torch.save(model.state_dict(), '~~~/model_weight/best_model.pth')
