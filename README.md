@@ -1,4 +1,35 @@
+## ディレクトリ構造
+OpenHouse2024
+├── README.md
+├── eval.py
+├── main.py
+├── residualblock.py
+├── model_weight
+│   └── 2024-10-15-14-09.pth
+├── openhouse2024_competition
+│   ├── eval_data
+│   │   ├── images
+│   │   └── images_info.csv
+│   ├── test
+│   │   ├── images
+│   │   └── images_info.csv
+│   └── train
+│       ├── あ
+│       ├── い
+│       ├── お
+│       ├── に
+│       ├── ぬ
+│       ├── ね
+│       ├── は
+│       ├── め
+│       ├── れ
+│       └── ろ
+└── result
+    ├── acc.png
+    └── loss.png
+
 ## How to use
+上のディレクトリ構造通りに配置すれば動作はするはず。
 main.pyと同じ階層でデータ格納用ディレクトリを作成
 ```
 mkdir openhouse2024_competition

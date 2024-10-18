@@ -1,66 +1,72 @@
 import os
 import pandas as pd
-import shutil
+from glob import glob
+from PIL import Image
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader
+from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 from torchvision.datasets import ImageFolder
 import matplotlib.pyplot as plt
 from residualblock import ResidualBlock
 from timm.scheduler import CosineLRScheduler
-from datetime import datetime
-from zoneinfo import ZoneInfo
+from tqdm import tqdm
 
-def make_dataset(dir_path, savedir_path):
-
-    # 既にディレクトリが作成されている場合は作成処理を行わない
-    if os.path.exists(save_dir):
-        pass
-    else:
-        os.mkdir(save_dir)
+# カスタムデータセット
+class CustomImageDataset(Dataset):
+    def __init__(self, dir_path, transform):
+        self.img_paths = glob(os.path.join(dir_path, 'images/*.png'))
+        self.transform = transform
     
-    # images_info.csvの読み込み
-    img_data = pd.read_csv(dir_path + '/images_info.csv', header = None)
+    def __len__(self):
+        return len(self.img_paths)
+    
+    def __getitem__(self, index):
+        img_path = self.img_paths[index]
+        img = Image.open(img_path).convert("RGB")
+        
+        if self.transform:
+            img = self.transform(img)
 
-    classes = sorted(img_data[1].unique())
-
-    for class_name in classes:
-
-        # class_name毎のディレクトリのパス
-        class_dir = savedir_path + "/" + class_name
-
-        # 既にディレクトリが作成されている場合は作成処理を行わない
-        if os.path.exists(class_dir):
-            pass
-        else:
-            os.mkdir(class_dir)
-
-        # class_nameごとのimageファイルの抽出とリスト化
-        img_list = img_data[img_data[1] == class_name][0].to_list()
-
-        # 該当の画像をtestv2の各クラスディレクトリにコピー
-        for img in img_list:
-            shutil.copy(dir_path + "/images/" + img, class_dir)
+        return img
 
 # 評価用関数
-def evaluation(net_model, loader):
+def evaluation(net_model, loader, train_flag, infocsv_path, class_to_idx):
 
     sum_loss = 0
     sum_correct = 0
 
     with torch.no_grad():
-        for (inputs, labels) in loader:
-            inputs, labels = inputs.to(device), labels.to(device)
-            outputs = net_model(inputs)
-            loss = criterion(outputs, labels)
-            sum_loss += loss.item()
-            _, predict_label = outputs.max(axis = 1)
-            sum_correct += (predict_label == labels).sum().item()
-    
-    mean_loss = sum_loss / len(loader.dataset)
-    accuracy = sum_correct / len(loader.dataset)
+
+        # trainデータとvalidデータでラベルの有無が存在するため、処理を分割
+        if train_flag:
+            for (inputs, labels) in loader:
+                inputs, labels = inputs.to(device), labels.to(device)
+                outputs = net_model(inputs)
+                loss = criterion(outputs, labels)
+                sum_loss += loss.item()
+                _, predict_label = outputs.max(axis = 1)
+                sum_correct += (predict_label == labels).sum().item()
+        else:
+            # images_info.csvからラベルデータを取得して、数値データに変換している
+            # 数値データに変換することによってvalidデータに対する誤差と精度を算出できるようになる
+            true_file = infocsv_path
+            true_df = pd.read_csv(true_file, names = ['img', 'label'], header = None)
+            true_label = true_df.iloc[:, 1].to_numpy()
+            true_label = [class_to_idx[label] for label in true_label]
+            true_label = torch.tensor(true_label).to(device)
+
+            for inputs in loader:
+                inputs = inputs.to(device)
+                outputs = net_model(inputs)
+                loss = criterion(outputs, true_label)
+                sum_loss += loss.item()
+                _, predict_label = outputs.max(axis = 1)
+                sum_correct += (predict_label == true_label).sum().item()
+
+        mean_loss = sum_loss / len(loader.dataset)
+        accuracy = sum_correct / len(loader.dataset)
 
     return mean_loss, accuracy
 
@@ -105,17 +111,12 @@ class Net(nn.Module):
         return out
 
 if __name__ == "__main__":
-    now_date = datetime.now(ZoneInfo("Asia/Tokyo"))
-    print(f"-----{now_date}-----")
 
+    # GPU or CPU
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    # validデータセット作成
-    valid_dir = '~~~/testv2'
-    make_dataset(dir_path = '~~~/test', savedir_path = valid_dir)
-
-    # trainデータのディレクトリパス
-    train_dir = '~~~/train'
+    # main.pyの親ディレクトリのフルパス(パスをいちいち書き換える必要がなくなる)
+    dir_fullpath = os.path.dirname(__file__)
 
     # データの前処理
     transform_train = transforms.Compose([
@@ -133,27 +134,24 @@ if __name__ == "__main__":
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
 
+    # trainとvalidのパス
+    train_dir = dir_fullpath + '/openhouse2024_competition/train'
+    valid_dir = dir_fullpath + '/openhouse2024_competition/test'
+
     # データセット＆データローダー作成
     train_dataset = ImageFolder(root = train_dir, transform = transform_train)
-    valid_dataset = ImageFolder(root = valid_dir, transform = transform_valid)
+    valid_dataset = CustomImageDataset(dir_path = valid_dir, transform = transform_valid)
 
-    train_loader = DataLoader(train_dataset, batch_size = 8, shuffle = True)
-    valid_loader = DataLoader(valid_dataset, batch_size = 8, shuffle = False)
+    train_loader = DataLoader(train_dataset, batch_size = 4, shuffle = True)
+    valid_loader = DataLoader(valid_dataset, batch_size = len(valid_dataset.img_paths), shuffle = False)
     
     # 学習の設定
-    epochs = 100
+    epochs = 1
     model = Net()
     model = model.to(device)
     criterion = nn.CrossEntropyLoss(label_smoothing = 0.005)
     optimizer = optim.Adam(model.parameters())
     scheduler = CosineLRScheduler(optimizer, t_initial = epochs, lr_min = 0.0001, warmup_t = 20, warmup_lr_init = 0.00005, warmup_prefix = True)
-
-    # 結果を格納するディレクトリの作成
-    save_dir = '~~~/result'
-    if os.path.exists(save_dir):
-        pass
-    else:
-        os.mkdir(save_dir)
 
     # 結果を格納するリスト
     train_loss_value = []
@@ -166,7 +164,7 @@ if __name__ == "__main__":
 
         model.train()
 
-        for (inputs, labels) in train_loader:
+        for (inputs, labels) in tqdm(train_loader):
             inputs, labels = inputs.to(device), labels.to(device)
             optimizer.zero_grad()
             outputs = model(inputs)
@@ -176,8 +174,8 @@ if __name__ == "__main__":
         scheduler.step(epoch + 1)
 
         model.eval()
-        train_loss, train_acc = evaluation(model, train_loader)
-        valid_loss, valid_acc = evaluation(model, valid_loader)
+        train_loss, train_acc = evaluation(model, train_loader, train_flag = True, infocsv_path = None, class_to_idx = None)
+        valid_loss, valid_acc = evaluation(model, valid_loader, train_flag = False, infocsv_path = valid_dir + '/images_info.csv', class_to_idx = train_dataset.class_to_idx)
 
         print(f"[{epoch + 1}/{epochs}] :: train loss: {train_loss:.5f}, train acc: {train_acc:.5f}, valid loss: {valid_loss:.5f}, valid acc: {valid_acc:.5f}")
 
@@ -186,6 +184,13 @@ if __name__ == "__main__":
         valid_loss_value.append(valid_loss)
         valid_acc_value.append(valid_acc)
 
+    # 結果を格納するディレクトリの作成
+    result_savedir = dir_fullpath + '/result'
+    if os.path.exists(result_savedir):
+        pass
+    else:
+        os.mkdir(result_savedir)
+    
     # 結果の描画
     plt.plot(range(epochs), train_loss_value, c = 'orange', label = 'train loss')
     plt.plot(range(epochs), valid_loss_value, c = 'blue', label = 'valid loss')
@@ -194,7 +199,7 @@ if __name__ == "__main__":
     plt.grid()
     plt.legend()
     plt.title('loss')
-    plt.savefig("~~~/result/loss.png")
+    plt.savefig(result_savedir + '/loss.png')
     plt.clf()
 
     plt.plot(range(epochs), train_acc_value, c = 'orange', label = 'train acc')
@@ -204,14 +209,14 @@ if __name__ == "__main__":
     plt.grid()
     plt.legend()
     plt.title('acc')
-    plt.savefig("~~~/result/acc.png")
+    plt.savefig(result_savedir + '/acc.png')
 
     # モデルの保存
-    save_dir = '~~~/model_weight'
-    if os.path.exists(save_dir):
+    model_savedir = dir_fullpath + '/model_weight'
+    if os.path.exists(model_savedir):
         pass
     else:
-        os.mkdir(save_dir)
+        os.mkdir(model_savedir)
 
     model_pram = model.state_dict()
-    torch.save(model.state_dict(), '~~~/model_weight/best_model.pth')
+    torch.save(model.state_dict(), model_savedir + '/best_model.pth')
