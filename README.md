@@ -1,4 +1,5 @@
 ## ディレクトリ構造
+```
 OpenHouse2024
 ├── README.md
 ├── eval.py
@@ -27,7 +28,7 @@ OpenHouse2024
 └── result
     ├── acc.png
     └── loss.png
-
+```
 ## How to use
 上のディレクトリ構造通りに配置すれば動作はするはず。
 main.pyと同じ階層でデータ格納用ディレクトリを作成
