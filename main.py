@@ -79,27 +79,32 @@ class Net(nn.Module):
             nn.Conv2d(3, 8, kernel_size = 5, padding = 1),
             ResidualBlock(input_dim = 8, output_dim = 16),
             nn.MaxPool2d(2, stride = 2),
-            nn.Dropout(p = 0.3)
+            nn.Dropout(p = 0.3),
         )
         self.layer2 = nn.Sequential(
             ResidualBlock(input_dim = 16, output_dim = 32),
             ResidualBlock(input_dim = 32, output_dim = 32),
             nn.MaxPool2d(2, stride = 2),
-            nn.Dropout(p = 0.3)
+            nn.Dropout(p = 0.3),
         )
         self.layer3 = nn.Sequential(
             ResidualBlock(input_dim = 32, output_dim = 64),
             ResidualBlock(input_dim = 64, output_dim = 64),
             nn.MaxPool2d(2, stride = 2),
-            nn.Dropout(p = 0.3)
+            nn.Dropout(p = 0.3),
         )
         self.linear = nn.Sequential(
             nn.Linear(64 * 15 * 15, 1024),
             nn.BatchNorm1d(1024),
-            nn.LeakyReLU(negative_slope = 0.01),
-            nn.Linear(1024, 10),
+            nn.LeakyReLU(),
+            nn.Dropout(p = 0.3),
+            nn.Linear(1024, 256),
+            nn.BatchNorm1d(256),
+            nn.LeakyReLU(),
+            nn.Dropout(p = 0.3),
+            nn.Linear(256, 10),
             nn.BatchNorm1d(10),
-            nn.LeakyReLU(negative_slope = 0.01)
+            nn.LeakyReLU()
         )
 
     def forward(self, x):
@@ -123,10 +128,9 @@ if __name__ == "__main__":
         transforms.ToTensor(),
         transforms.RandomHorizontalFlip(p = 0.5),
         transforms.RandomVerticalFlip(p = 0.5),
-        transforms.RandomInvert(p = 0.4),
+        transforms.RandomInvert(p = 0.5),
         transforms.Resize(128),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-        transforms.RandomErasing(p = 0.3, scale = (0.02, 0.33), ratio = (0.3, 3.3))
     ])
     transform_valid = transforms.Compose([
         transforms.Resize(128),
@@ -146,12 +150,12 @@ if __name__ == "__main__":
     valid_loader = DataLoader(valid_dataset, batch_size = len(valid_dataset.img_paths), shuffle = False)
     
     # 学習の設定
-    epochs = 1
+    epochs = 1000
     model = Net()
     model = model.to(device)
     criterion = nn.CrossEntropyLoss(label_smoothing = 0.005)
-    optimizer = optim.Adam(model.parameters())
-    scheduler = CosineLRScheduler(optimizer, t_initial = epochs, lr_min = 0.0001, warmup_t = 20, warmup_lr_init = 0.00005, warmup_prefix = True)
+    optimizer = optim.Adam(model.parameters(), weight_decay = 0.0001)
+    scheduler = CosineLRScheduler(optimizer, t_initial = epochs, lr_min = 0.0001, warmup_t = 50, warmup_lr_init = 0.00005, warmup_prefix = True)
 
     # 結果を格納するリスト
     train_loss_value = []
@@ -184,6 +188,12 @@ if __name__ == "__main__":
         valid_loss_value.append(valid_loss)
         valid_acc_value.append(valid_acc)
 
+        # 学習回数が900回以上かつ、検証スコアが高いモデルを保存する
+        if epoch > 900 and valid_loss < best_loss:
+            model_pram = model.state_dict()
+            torch.save(model.state_dict(), dir_fullpath + '/model_weight/best_model.pth')
+            best_loss = valid_loss
+
     # 結果を格納するディレクトリの作成
     result_savedir = dir_fullpath + '/result'
     if os.path.exists(result_savedir):
@@ -210,13 +220,3 @@ if __name__ == "__main__":
     plt.legend()
     plt.title('acc')
     plt.savefig(result_savedir + '/acc.png')
-
-    # モデルの保存
-    model_savedir = dir_fullpath + '/model_weight'
-    if os.path.exists(model_savedir):
-        pass
-    else:
-        os.mkdir(model_savedir)
-
-    model_pram = model.state_dict()
-    torch.save(model.state_dict(), model_savedir + '/best_model.pth')
