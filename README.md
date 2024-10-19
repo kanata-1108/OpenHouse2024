@@ -6,7 +6,7 @@ OpenHouse2024
 ├── main.py
 ├── residualblock.py
 ├── model_weight
-│   └── 2024-10-15-14-09.pth
+│   └── best_model.pth
 ├── openhouse2024_competition
 │   ├── eval_data
 │   │   ├── images
@@ -26,20 +26,16 @@ OpenHouse2024
 │       ├── れ
 │       └── ろ
 └── result
+    ├── result.txt
     ├── acc.png
     └── loss.png
 ```
 ## How to use
-上のディレクトリ構造通りに配置すれば動作はするはず。
-main.pyと同じ階層でデータ格納用ディレクトリを作成
-```
-mkdir openhouse2024_competition
-```
-訓練データ、検証データ、テストデータを配置。訓練データと同じ構造（各ラベルごとにディレクトリが存在）にするため、make_valid.pyを実行する。この際ディレクトリのパスを変更する必要があるので注意
+上のディレクトリ構造通りに配置すれば動作はするはず(ディレクトリ名も同じにする必要あり)。
 
 同じ構造にできたらあとはプログラムにディレクトリのパスを記述して、`main.py`を実行して学習させる。
 
-学習後にモデルが`model`ディレクトリに格納されるのでそれを`eval.py`で参照して実行すると推論結果が表示される。
+学習後にモデルが`model_weight`ディレクトリに格納されるのでそれを`eval.py`で参照して実行すると推論結果が表示される。
 ## 各種プログラムについて
 ### main.py
 

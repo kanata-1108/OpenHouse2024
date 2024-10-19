@@ -1,6 +1,5 @@
 import os
 import pandas as pd
-from glob import glob
 from PIL import Image
 import torch
 import torch.nn as nn
@@ -11,12 +10,15 @@ from torchvision.datasets import ImageFolder
 import matplotlib.pyplot as plt
 from residualblock import ResidualBlock
 from timm.scheduler import CosineLRScheduler
-from tqdm import tqdm
+
+# 画像データを番号順にソートする関数
+def sort_key(fname):
+    return int(''.join(filter(str.isdigit, fname)))
 
 # カスタムデータセット
 class CustomImageDataset(Dataset):
     def __init__(self, dir_path, transform):
-        self.img_paths = glob(os.path.join(dir_path, 'images/*.png'))
+        self.img_paths = sorted([os.path.join(dir_path, fname) for fname in os.listdir(dir_path)], key = sort_key)
         self.transform = transform
     
     def __len__(self):
@@ -144,9 +146,9 @@ if __name__ == "__main__":
 
     # データセット＆データローダー作成
     train_dataset = ImageFolder(root = train_dir, transform = transform_train)
-    valid_dataset = CustomImageDataset(dir_path = valid_dir, transform = transform_valid)
+    valid_dataset = CustomImageDataset(dir_path = valid_dir + '/images', transform = transform_valid)
 
-    train_loader = DataLoader(train_dataset, batch_size = 4, shuffle = True)
+    train_loader = DataLoader(train_dataset, batch_size = 8, shuffle = True)
     valid_loader = DataLoader(valid_dataset, batch_size = len(valid_dataset.img_paths), shuffle = False)
     
     # 学習の設定
@@ -163,12 +165,15 @@ if __name__ == "__main__":
     valid_loss_value = []
     valid_acc_value = []
 
+    # 最小の損失値
+    best_loss = float('inf')
+
     # 学習
     for epoch in range(epochs):
 
         model.train()
 
-        for (inputs, labels) in tqdm(train_loader):
+        for (inputs, labels) in train_loader:
             inputs, labels = inputs.to(device), labels.to(device)
             optimizer.zero_grad()
             outputs = model(inputs)
