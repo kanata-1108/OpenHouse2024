@@ -17,55 +17,44 @@ def sort_key(fname):
 
 # カスタムデータセット
 class CustomImageDataset(Dataset):
-    def __init__(self, dir_path, transform):
+    def __init__(self, dir_path, transform, infocsv_path, class_to_idx):
         self.img_paths = sorted([os.path.join(dir_path, fname) for fname in os.listdir(dir_path)], key = sort_key)
         self.transform = transform
+        self.infocsv_path = infocsv_path
+        self.class_to_idx = class_to_idx
     
     def __len__(self):
         return len(self.img_paths)
     
     def __getitem__(self, index):
+        true_file = self.infocsv_path
+        true_df = pd.read_csv(true_file, names = ['img', 'label'], header = None)
+        labels = true_df.iloc[:, 1].to_numpy()
+        labels = [self.class_to_idx[label] for label in labels]
+
         img_path = self.img_paths[index]
         img = Image.open(img_path).convert("RGB")
+        label = labels[index]
         
         if self.transform:
             img = self.transform(img)
 
-        return img
+        return img, label
 
 # 評価用関数
-def evaluation(net_model, loader, train_flag, infocsv_path, class_to_idx):
+def evaluation(net_model, loader):
 
     sum_loss = 0
     sum_correct = 0
 
     with torch.no_grad():
-
-        # trainデータとvalidデータでラベルの有無が存在するため、処理を分割
-        if train_flag:
-            for (inputs, labels) in loader:
-                inputs, labels = inputs.to(device), labels.to(device)
-                outputs = net_model(inputs)
-                loss = criterion(outputs, labels)
-                sum_loss += loss.item()
-                _, predict_label = outputs.max(axis = 1)
-                sum_correct += (predict_label == labels).sum().item()
-        else:
-            # images_info.csvからラベルデータを取得して、数値データに変換している
-            # 数値データに変換することによってvalidデータに対する誤差と精度を算出できるようになる
-            true_file = infocsv_path
-            true_df = pd.read_csv(true_file, names = ['img', 'label'], header = None)
-            true_label = true_df.iloc[:, 1].to_numpy()
-            true_label = [class_to_idx[label] for label in true_label]
-            true_label = torch.tensor(true_label).to(device)
-
-            for inputs in loader:
-                inputs = inputs.to(device)
-                outputs = net_model(inputs)
-                loss = criterion(outputs, true_label)
-                sum_loss += loss.item()
-                _, predict_label = outputs.max(axis = 1)
-                sum_correct += (predict_label == true_label).sum().item()
+        for (inputs, labels) in loader:
+            inputs, labels = inputs.to(device), labels.to(device)
+            outputs = net_model(inputs)
+            loss = criterion(outputs, labels)
+            sum_loss += loss.item()
+            _, predict_label = outputs.max(axis = 1)
+            sum_correct += (predict_label == labels).sum().item()
 
         mean_loss = sum_loss / len(loader.dataset)
         accuracy = sum_correct / len(loader.dataset)
@@ -146,10 +135,12 @@ if __name__ == "__main__":
 
     # データセット＆データローダー作成
     train_dataset = ImageFolder(root = train_dir, transform = transform_train)
-    valid_dataset = CustomImageDataset(dir_path = valid_dir + '/images', transform = transform_valid)
+    # class_to_idxesの内容 -> {'あ': 0, 'い': 1, 'お': 2, 'に': 3, 'ぬ': 4, 'ね': 5, 'は': 6, 'め': 7, 'れ': 8, 'ろ': 9}
+    class_to_idxes = train_dataset.class_to_idx
+    valid_dataset = CustomImageDataset(dir_path = valid_dir + '/images', transform = transform_valid, infocsv_path = valid_dir + '/images_info.csv', class_to_idx = class_to_idxes)
 
     train_loader = DataLoader(train_dataset, batch_size = 8, shuffle = True)
-    valid_loader = DataLoader(valid_dataset, batch_size = len(valid_dataset.img_paths), shuffle = False)
+    valid_loader = DataLoader(valid_dataset, batch_size = 8, shuffle = False)
     
     # 学習の設定
     epochs = 1000
@@ -183,8 +174,8 @@ if __name__ == "__main__":
         scheduler.step(epoch + 1)
 
         model.eval()
-        train_loss, train_acc = evaluation(model, train_loader, train_flag = True, infocsv_path = None, class_to_idx = None)
-        valid_loss, valid_acc = evaluation(model, valid_loader, train_flag = False, infocsv_path = valid_dir + '/images_info.csv', class_to_idx = train_dataset.class_to_idx)
+        train_loss, train_acc = evaluation(model, train_loader)
+        valid_loss, valid_acc = evaluation(model, valid_loader)
 
         print(f"[{epoch + 1}/{epochs}] :: train loss: {train_loss:.5f}, train acc: {train_acc:.5f}, valid loss: {valid_loss:.5f}, valid acc: {valid_acc:.5f}")
 

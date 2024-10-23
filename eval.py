@@ -14,33 +14,44 @@ def sort_key(fname):
 
 # カスタムデータセット
 class CustomImageDataset(Dataset):
-    def __init__(self, dir_path, transform):
+    def __init__(self, dir_path, transform, infocsv_path, class_to_idx):
         self.img_paths = sorted([os.path.join(dir_path, fname) for fname in os.listdir(dir_path)], key = sort_key)
         self.transform = transform
+        self.infocsv_path = infocsv_path
+        self.class_to_idx = class_to_idx
     
     def __len__(self):
         return len(self.img_paths)
     
     def __getitem__(self, index):
+        true_file = self.infocsv_path
+        true_df = pd.read_csv(true_file, names = ['img', 'label'], header = None)
+        labels = true_df.iloc[:, 1].to_numpy()
+        labels = [self.class_to_idx[label] for label in labels]
+
         img_path = self.img_paths[index]
         img = Image.open(img_path).convert("RGB")
+        label = labels[index]
         
         if self.transform:
             img = self.transform(img)
 
-        return img
+        return img, label
 
+# 評価用関数
 def evaluation(net_model, loader):
+    sum_correct = 0
 
     with torch.no_grad():
-        for inputs in loader:
-            inputs = inputs.to(device)
+        for (inputs, labels) in loader:
+            inputs, labels = inputs.to(device), labels.to(device)
             outputs = net_model(inputs)
             _, predict_label = outputs.max(axis = 1)
+            sum_correct += (predict_label == labels).sum().item()
         
-        predict_label = predict_label.tolist()
+        accuracy = sum_correct / len(loader.dataset)
 
-    return predict_label
+    print(f"正解率: {accuracy * 100} %")
 
 if __name__ == "__main__":
 
@@ -50,6 +61,9 @@ if __name__ == "__main__":
     # main.pyの親ディレクトリのフルパス(パスをいちいち書き換える必要がなくなる)
     dir_fullpath = os.path.dirname(__file__)
 
+    # eval_dataのパス
+    eval_dir = dir_fullpath + '/openhouse2024_competition/eval_data'
+
     # データの処理
     transform_eval = transforms.Compose([
         transforms.Resize(128),
@@ -57,7 +71,8 @@ if __name__ == "__main__":
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
 
-    eval_dataset = CustomImageDataset(dir_path = dir_fullpath + '/openhouse2024_competition/eval_data/images', transform = transform_eval)
+    class_to_idxes = {'あ': 0, 'い': 1, 'お': 2, 'に': 3, 'ぬ': 4, 'ね': 5, 'は': 6, 'め': 7, 'れ': 8, 'ろ': 9}
+    eval_dataset = CustomImageDataset(dir_path = eval_dir + '/images', transform = transform_eval, infocsv_path = eval_dir + '/images_info.csv', class_to_idx = class_to_idxes)
     eval_loader = DataLoader(eval_dataset, batch_size = len(eval_dataset.img_paths))
 
     # パラメータの読み込みとモデルインスタンスの作成
@@ -67,22 +82,5 @@ if __name__ == "__main__":
     eval_model = eval_model.to(device)
     eval_model.eval()
 
-    # 推論処理
+    # 推論&精度算出
     pred = evaluation(eval_model, eval_loader)
-
-    # 出力が数値なので平仮名に直す
-    class_index = {0: 'あ', 1: 'い', 2: 'お', 3: 'に', 4: 'ぬ', 5: 'ね', 6: 'は', 7: 'め', 8: 'れ', 9: 'ろ'}
-    pred = [class_index[label] for label in pred]
-    pred_df = pd.DataFrame(pred, columns = ['label'])
-
-    # 正解ラベルの抽出
-    true_file = dir_fullpath + '/openhouse2024_competition/eval_data/images_info.csv'
-    true_df = pd.read_csv(true_file, names = ['img', 'label'], header = None)
-    true_label = true_df.iloc[:, [1]]
-
-    # 正解率の算出
-    matches = (true_label == pred_df).all(axis = 1)
-    num_matches = matches.sum()
-
-    print(f"Accuracy: {num_matches / 10}")
-    
