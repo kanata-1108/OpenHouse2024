@@ -47,8 +47,8 @@ OpenHouse2024
 モデルに使用している残差ブロックのプログラム
 
 ## 結果
-![acc](https://github.com/user-attachments/assets/c60ec00d-fe56-4297-b4e8-65a83481591e)
+![acc](https://github.com/user-attachments/assets/e6cb9e40-e477-480a-95c0-57fec469c919)
 
-![loss](https://github.com/user-attachments/assets/dea45a72-7994-473e-8863-0a4b95ba929e)
+![loss](https://github.com/user-attachments/assets/74726163-e70a-457c-9b04-d56ab737e520)
 
-推論時のスコア：77.7%
+推論時のスコア：81.8%
