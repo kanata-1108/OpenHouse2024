@@ -36,19 +36,19 @@ OpenHouse2024
 ## 各種プログラムについて
 ### main.py
 
-メインのプログラム。
+メインのプログラム
 
 ### eval.py
 
-推論用のプログラム。
+推論用のプログラム
 
 ### residualblock.py
 
-モデルに使用している残差ブロックのプログラム
+モデルに使用している残差ブロックのプログラム。ResNetを参考に作成。
 
 ## 結果
 ![acc](https://github.com/user-attachments/assets/e6cb9e40-e477-480a-95c0-57fec469c919)
 
 ![loss](https://github.com/user-attachments/assets/74726163-e70a-457c-9b04-d56ab737e520)
 
-推論時のスコア：81.8%
+評価用データの正解率：81.8%
